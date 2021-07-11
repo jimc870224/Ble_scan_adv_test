@@ -81,12 +81,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         listBluetoothDevice = new ArrayList<>();
 
-        if( !BluetoothAdapter.getDefaultAdapter().isMultipleAdvertisementSupported() ) {
 
-            Toast.makeText( this, "Multiple advertisement not supported", Toast.LENGTH_SHORT ).show();
-            mAdvertiseButton.setEnabled( false );
-            mDiscoverButton.setEnabled( false );
-        }
 
 
         /*if(mBluetoothAdapter.isMultipleAdvertisementSupported()){
@@ -150,43 +145,35 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         scanLeDevice(true);
 
-        /*
-        List<ScanFilter> filters = null;
-
-        ScanFilter filter = new ScanFilter.Builder()
-                .setServiceUuid( new ParcelUuid(UUID.fromString( getString(R.string.ble_uuid ) ) ) )
-                .build();
-        filters.add( filter );
-
-        ScanSettings settings = new ScanSettings.Builder()
-                .setScanMode( ScanSettings.SCAN_MODE_LOW_LATENCY )
-                .build();
-
-        mBluetoothLeScanner.startScan(filters, settings, mScanCallback);
-
-
-        */
-
     }
 
 
-
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public void advertise() {
+
+        if( !BluetoothAdapter.getDefaultAdapter().isMultipleAdvertisementSupported() ) {
+
+            Toast.makeText( this, "Multiple advertisement not supported", Toast.LENGTH_SHORT ).show();
+            mAdvertiseButton.setEnabled( false );
+            mDiscoverButton.setEnabled( false );
+        }
+        else Log.d("TAG", "Multiple advertisement supported");
 
 
         BluetoothLeAdvertiser advertiser = BluetoothAdapter.getDefaultAdapter().getBluetoothLeAdvertiser();
+
         AdvertiseSettings settings = new AdvertiseSettings.Builder()
                 .setAdvertiseMode( AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY )
                 .setTxPowerLevel( AdvertiseSettings.ADVERTISE_TX_POWER_HIGH )
-                .setConnectable( false )
+                .setConnectable( true )
                 .build();
 
         //UUID
-        ParcelUuid pUuid = new ParcelUuid( UUID.fromString( getString( R.string.ble_uuid ) ) );
+        ParcelUuid pUUID = new ParcelUuid( UUID.fromString( getString( R.string.ble_uuid ) ) );
+
         AdvertiseData data = new AdvertiseData.Builder()
                 .setIncludeDeviceName( true )
-                .addServiceUuid( pUuid )
-                .addServiceData( pUuid, "Data".getBytes( Charset.forName( "UTF-8" ) ) )
+                .addServiceData( pUUID, "Data".getBytes( Charset.forName( "UTF-8" ) ) )
                 .build();
 
 
@@ -195,6 +182,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             @Override
             public void onStartSuccess(AdvertiseSettings settingsInEffect) {
                 super.onStartSuccess(settingsInEffect);
+
+                Log.e( "BLE", "Advertising onStartSuccess ");
             }
 
             @Override
