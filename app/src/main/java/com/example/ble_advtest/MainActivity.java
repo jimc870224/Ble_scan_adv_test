@@ -44,23 +44,30 @@ import static com.example.ble_advtest.BluetoothLeService.byteArrayToHexStr;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener{
 
-    //advertise();
+    //UI
     private TextView mText;
-    private Button mAdvertiseButton;
-    private Button mDiscoverButton;
+    private Button mStartButton;
+    private Button mStopButton;
 
-    //discover();
+    //handler
+    private Handler advertisingHandler = new Handler();
+    private Handler scanHandler = new Handler();
+    private final int TIMEOUT = 1000;//(ms)
+    private boolean mScanning = false;
+    private boolean mAdvertising = false;
+
+    //advertiser
+    private BluetoothLeAdvertiser mAdvertiser;
+    private AdvertiseSettings mAdvertiseSettings;
+    private AdvertiseData mAdvertiseData;
+
+    //scaner
     List<BluetoothDevice> listBluetoothDevice;
 
-    private static final long SCAN_PERIOD = 10000; // Stops scanning after 10 seconds.
     private BluetoothAdapter mBluetoothAdapter;
     private BluetoothLeScanner mBluetoothLeScanner;
-    private Handler mHandler = new Handler();
 
     private static int PERMISSION_REQUEST_CODE = 1;
-    private static final int REQUEST_FINE_LOCATION_PERMISSION = 102;
-    private static final int REQUEST_ENABLE_BT = 2;
-
 
 
     @RequiresApi(api = Build.VERSION_CODES.O)
@@ -70,24 +77,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         setContentView(R.layout.activity_main);
 
         mText = (TextView) findViewById( R.id.text );
-        mDiscoverButton = (Button) findViewById( R.id.discover_btn );
-        mAdvertiseButton = (Button) findViewById( R.id.advertise_btn );
+        mStopButton = (Button) findViewById( R.id.stop_btn );
+        mStartButton = (Button) findViewById( R.id.start_btn );
 
-        mDiscoverButton.setOnClickListener( this );
-        mAdvertiseButton.setOnClickListener( this );
+        mStopButton.setOnClickListener( this );
+        mStartButton.setOnClickListener( this );
 
         mBluetoothLeScanner = BluetoothAdapter.getDefaultAdapter().getBluetoothLeScanner();
         checkPermission();
+        mText.setText("Ready to Start");
 
         listBluetoothDevice = new ArrayList<>();
-
-
-
-
-        /*if(mBluetoothAdapter.isMultipleAdvertisementSupported()){
-            Log.e( "onCreate", "isMultipleAdvertisementSupported() ");
-        }*/
-
 
 
     }
@@ -107,6 +107,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             finish();
         }
 
+        if( !BluetoothAdapter.getDefaultAdapter().isMultipleAdvertisementSupported() ) {
+
+            Toast.makeText( this, "Multiple advertisement not supported", Toast.LENGTH_SHORT ).show();
+            mStartButton.setEnabled( false );
+            mStopButton.setEnabled( false );
+        }
+        else Log.d("TAG", "Multiple advertisement supported");
+
+
+        getBleAdvertiser();
         getBluetoothAdapterAndLeScanner();
 
         // Checks if Bluetooth is supported on the device.
@@ -134,35 +144,29 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     public void onClick(View v) {
-        if( v.getId() == R.id.discover_btn ) {
-            discover();
-        } else if( v.getId() == R.id.advertise_btn ) {
-            advertise();
+        if( v.getId() == R.id.stop_btn ) {
+            advertisingHandler.removeCallbacks(stop_advertising);
+            scanHandler.removeCallbacks(stop_scan);
+
+            mText.setText("Ready to Start");
+            advertise(false);
+            scan(false);
+            mStartButton.setEnabled(true);
+            mStopButton.setEnabled(false);
+
+        } else if( v.getId() == R.id.start_btn ) {
+            advertise(true);
+            mStartButton.setEnabled(false);
+            mStopButton.setEnabled(true);
         }
     }
-
-    public void discover() {
-
-        scanLeDevice(true);
-
-    }
-
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-    public void advertise() {
+    private void getBleAdvertiser() {
 
-        if( !BluetoothAdapter.getDefaultAdapter().isMultipleAdvertisementSupported() ) {
+        mAdvertiser = BluetoothAdapter.getDefaultAdapter().getBluetoothLeAdvertiser();
 
-            Toast.makeText( this, "Multiple advertisement not supported", Toast.LENGTH_SHORT ).show();
-            mAdvertiseButton.setEnabled( false );
-            mDiscoverButton.setEnabled( false );
-        }
-        else Log.d("TAG", "Multiple advertisement supported");
-
-
-        BluetoothLeAdvertiser advertiser = BluetoothAdapter.getDefaultAdapter().getBluetoothLeAdvertiser();
-
-        AdvertiseSettings settings = new AdvertiseSettings.Builder()
+        mAdvertiseSettings = new AdvertiseSettings.Builder()
                 .setAdvertiseMode( AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY )
                 .setTxPowerLevel( AdvertiseSettings.ADVERTISE_TX_POWER_HIGH )
                 .setConnectable( true )
@@ -170,31 +174,47 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         //UUID
         ParcelUuid pUUID = new ParcelUuid( UUID.fromString( getString( R.string.ble_uuid ) ) );
-
-        AdvertiseData data = new AdvertiseData.Builder()
+        mAdvertiseData = new AdvertiseData.Builder()
                 .setIncludeDeviceName( true )
                 .addServiceData( pUUID, "Data".getBytes( Charset.forName( "UTF-8" ) ) )
                 .build();
 
-
-        //Call back
-        AdvertiseCallback advertisingCallback = new AdvertiseCallback() {
-            @Override
-            public void onStartSuccess(AdvertiseSettings settingsInEffect) {
-                super.onStartSuccess(settingsInEffect);
-
-                Log.e( "BLE", "Advertising onStartSuccess ");
-            }
-
-            @Override
-            public void onStartFailure(int errorCode) {
-                Log.e( "BLE", "Advertising onStartFailure: " + errorCode );
-                super.onStartFailure(errorCode);
-            }
-        };
-
-        advertiser.startAdvertising( settings, data, advertisingCallback );
+        mAdvertising = false;
     }
+
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    public void advertise(final boolean enable) {
+
+        if (enable) {
+            //stop handler
+            advertisingHandler.postDelayed(stop_advertising, TIMEOUT);
+
+            Log.e( "BLE", "advertising" );
+            mText.setText("Advertising...");
+            mAdvertiser.startAdvertising(mAdvertiseSettings, mAdvertiseData, advertisingCallback);
+            mAdvertising = true;
+
+        }else {
+            mAdvertiser.stopAdvertising(advertisingCallback);
+            mAdvertising = false;
+        }
+    }
+
+    private AdvertiseCallback advertisingCallback = new AdvertiseCallback() {
+        @Override
+        public void onStartSuccess(AdvertiseSettings settingsInEffect) {
+            super.onStartSuccess(settingsInEffect);
+
+            Log.e( "BLE", "Advertising onStartSuccess ");
+        }
+
+        @Override
+        public void onStartFailure(int errorCode) {
+            Log.e( "BLE", "Advertising onStartFailure: " + errorCode );
+            super.onStartFailure(errorCode);
+        }
+    };
+
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     private void getBluetoothAdapterAndLeScanner() {
@@ -204,39 +224,26 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mBluetoothAdapter = bluetoothManager.getAdapter();
         mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
 
-        //mScanning = false;
+        mScanning = false;
     }
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-    private void scanLeDevice(final boolean enable) {
+    private void scan(final boolean enable) {
         if (enable) {
             listBluetoothDevice.clear();
             //listViewLE.invalidateViews();
 
-            // Stops scanning after a pre-defined scan period.
-            mHandler.postDelayed(new Runnable() {
-                @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-                @Override
-                public void run() {
-                    mBluetoothLeScanner.stopScan(scanCallback);
-                    //listViewLE.invalidateViews();
+            scanHandler.postDelayed(stop_scan,TIMEOUT);
 
-                    /*Toast.makeText(ScanActivity.this,
-                            "Scan timeout",
-                            Toast.LENGTH_LONG).show();*/
-
-                    //mScanning = false;
-                    mDiscoverButton.setEnabled(true);
-                }
-            }, SCAN_PERIOD);
-
+            Log.e( "BLE", "scanning" );
+            mText.setText("Scanning...");
             mBluetoothLeScanner.startScan(scanCallback);
-            //mScanning = true;
-            mDiscoverButton.setEnabled(false);
+            mScanning = true;
+
         } else {
             mBluetoothLeScanner.stopScan(scanCallback);
-            //mScanning = false;
-            mDiscoverButton.setEnabled(true);
+            mScanning = false;
+
         }
     }
 
@@ -270,6 +277,23 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 listBluetoothDevice.add(device);
                 //listViewLE.invalidateViews();
             }
+        }
+    };
+
+    //runnable
+    private Runnable stop_scan = new Runnable() {
+        @Override
+        public void run() {
+            mBluetoothLeScanner.stopScan(scanCallback);
+            advertise(true);
+        }
+    };
+
+    private Runnable stop_advertising = new Runnable() {
+        @Override
+        public void run() {
+            mAdvertiser.stopAdvertising(advertisingCallback);
+            scan(true);
         }
     };
 
