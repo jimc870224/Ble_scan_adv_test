@@ -52,21 +52,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     //handler
     private Handler advertisingHandler = new Handler();
     private Handler scanHandler = new Handler();
-    private final int TIMEOUT = 1000;//(ms)
+    private final int TIMEOUT = 300;//(ms)
     private boolean mScanning = false;
     private boolean mAdvertising = false;
 
+    //--Ble--
+    private BluetoothAdapter mBluetoothAdapter;
     //advertiser
     private BluetoothLeAdvertiser mAdvertiser;
     private AdvertiseSettings mAdvertiseSettings;
     private AdvertiseData mAdvertiseData;
-
     //scaner
     List<BluetoothDevice> listBluetoothDevice;
-
-    private BluetoothAdapter mBluetoothAdapter;
     private BluetoothLeScanner mBluetoothLeScanner;
 
+    //PERMISSION
     private static int PERMISSION_REQUEST_CODE = 1;
 
 
@@ -92,6 +92,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     }
 
+    //---permission and setup---
     private void checkPermission() {
 
         Log.d("TAG", "Request Location Permissions:");
@@ -115,9 +116,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
         else Log.d("TAG", "Multiple advertisement supported");
 
-
-        getBleAdvertiser();
-        getBluetoothAdapterAndLeScanner();
+        //getBleAdvertiser();
+        getBluetoothAdapterAndLeScannerAndAdvertiser();
 
         // Checks if Bluetooth is supported on the device.
         if (mBluetoothAdapter == null) {
@@ -143,11 +143,42 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    private void getBluetoothAdapterAndLeScannerAndAdvertiser() {
+        // Get BluetoothAdapter and BluetoothLeScanner and BluetoothLeAdvertiser.
+        final BluetoothManager bluetoothManager =
+                (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+        mBluetoothAdapter = bluetoothManager.getAdapter();
+
+        //--Scanner--
+        mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
+        mScanning = false;
+
+        //--Advertiser--
+        mAdvertiser = mBluetoothAdapter.getBluetoothLeAdvertiser();
+
+        mAdvertiseSettings = new AdvertiseSettings.Builder()
+                .setAdvertiseMode( AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY )
+                .setTxPowerLevel( AdvertiseSettings.ADVERTISE_TX_POWER_HIGH )
+                .setConnectable( true )
+                .build();
+        //UUID
+        ParcelUuid pUUID = new ParcelUuid( UUID.fromString( getString( R.string.ble_uuid ) ) );
+        mAdvertiseData = new AdvertiseData.Builder()
+                .setIncludeDeviceName( true )
+                .addServiceData( pUUID, "Data".getBytes( Charset.forName( "UTF-8" ) ) )
+                .build();
+        mAdvertising = false;
+    }
+    //---permission and setup---
+
+    //---UI---
     public void onClick(View v) {
         if( v.getId() == R.id.stop_btn ) {
             advertisingHandler.removeCallbacks(stop_advertising);
             scanHandler.removeCallbacks(stop_scan);
 
+            Log.e( "BLE", "-----stop-----" );
             mText.setText("Ready to Start");
             advertise(false);
             scan(false);
@@ -160,28 +191,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             mStopButton.setEnabled(true);
         }
     }
+    //---UI---
 
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-    private void getBleAdvertiser() {
-
-        mAdvertiser = BluetoothAdapter.getDefaultAdapter().getBluetoothLeAdvertiser();
-
-        mAdvertiseSettings = new AdvertiseSettings.Builder()
-                .setAdvertiseMode( AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY )
-                .setTxPowerLevel( AdvertiseSettings.ADVERTISE_TX_POWER_HIGH )
-                .setConnectable( true )
-                .build();
-
-        //UUID
-        ParcelUuid pUUID = new ParcelUuid( UUID.fromString( getString( R.string.ble_uuid ) ) );
-        mAdvertiseData = new AdvertiseData.Builder()
-                .setIncludeDeviceName( true )
-                .addServiceData( pUUID, "Data".getBytes( Charset.forName( "UTF-8" ) ) )
-                .build();
-
-        mAdvertising = false;
-    }
-
+    //---advertise and scan---
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public void advertise(final boolean enable) {
 
@@ -215,17 +227,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     };
 
-
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-    private void getBluetoothAdapterAndLeScanner() {
-        // Get BluetoothAdapter and BluetoothLeScanner.
-        final BluetoothManager bluetoothManager =
-                (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-        mBluetoothAdapter = bluetoothManager.getAdapter();
-        mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
-
-        mScanning = false;
-    }
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     private void scan(final boolean enable) {
@@ -279,6 +280,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }
     };
+    //---advertise and scan---
 
     //runnable
     private Runnable stop_scan = new Runnable() {
@@ -296,5 +298,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             scan(true);
         }
     };
+    //runnable
 
 }
