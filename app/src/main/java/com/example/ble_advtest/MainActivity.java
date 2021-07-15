@@ -33,10 +33,12 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static com.example.ble_advtest.BluetoothLeService.byteArrayToHexStr;
@@ -52,18 +54,25 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     //handler
     private Handler advertisingHandler = new Handler();
     private Handler scanHandler = new Handler();
-    private final int TIMEOUT = 300;//(ms)
+    //private final int TIMEOUT = 300;//(ms)
+    private final int Scanning_TIMEOUT = 2000;//(ms)
+    private final int Advtising_TIMEOUT = 300;//(ms)
     private boolean mScanning = false;
     private boolean mAdvertising = false;
 
     //--Ble--
+    //UUID
+    private ParcelUuid pUUID;
+
     private BluetoothAdapter mBluetoothAdapter;
     //advertiser
     private BluetoothLeAdvertiser mAdvertiser;
     private AdvertiseSettings mAdvertiseSettings;
     private AdvertiseData mAdvertiseData;
     //scaner
+    List<ScanFilter> mScanfilters = null;
     List<BluetoothDevice> listBluetoothDevice;
+    private ScanSettings mScanSettings;
     private BluetoothLeScanner mBluetoothLeScanner;
 
     //PERMISSION
@@ -150,7 +159,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         mBluetoothAdapter = bluetoothManager.getAdapter();
 
+        //UUID
+        pUUID = new ParcelUuid( UUID.fromString( getString( R.string.ble_uuid ) ) );
+
         //--Scanner--
+        mScanfilters = new ArrayList<>();
+        ScanFilter filter = new ScanFilter.Builder()
+                .setServiceData(pUUID, null)
+                .build();
+
+        mScanSettings = new ScanSettings.Builder()
+                .setScanMode( ScanSettings.SCAN_MODE_LOW_LATENCY )
+                .setCallbackType( ScanSettings.CALLBACK_TYPE_ALL_MATCHES )
+                .build();
+
         mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
         mScanning = false;
 
@@ -160,14 +182,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mAdvertiseSettings = new AdvertiseSettings.Builder()
                 .setAdvertiseMode( AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY )
                 .setTxPowerLevel( AdvertiseSettings.ADVERTISE_TX_POWER_HIGH )
-                .setConnectable( true )
+                .setConnectable( false )
                 .build();
-        //UUID
-        ParcelUuid pUUID = new ParcelUuid( UUID.fromString( getString( R.string.ble_uuid ) ) );
+
         mAdvertiseData = new AdvertiseData.Builder()
                 .setIncludeDeviceName( true )
-                .addServiceData( pUUID, "Data".getBytes( Charset.forName( "UTF-8" ) ) )
+                .addServiceData( pUUID, "Data".getBytes( Charset.forName( "US-ASCII" ) ) )
                 .build();
+
+        //Log.e( "Data", "-----stop-----" );
         mAdvertising = false;
     }
     //---permission and setup---
@@ -199,7 +222,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         if (enable) {
             //stop handler
-            advertisingHandler.postDelayed(stop_advertising, TIMEOUT);
+            advertisingHandler.postDelayed(stop_advertising, Advtising_TIMEOUT);
 
             Log.e( "BLE", "advertising" );
             mText.setText("Advertising...");
@@ -234,11 +257,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             listBluetoothDevice.clear();
             //listViewLE.invalidateViews();
 
-            scanHandler.postDelayed(stop_scan,TIMEOUT);
+            scanHandler.postDelayed(stop_scan,Scanning_TIMEOUT);
 
             Log.e( "BLE", "scanning" );
             mText.setText("Scanning...");
-            mBluetoothLeScanner.startScan(scanCallback);
+            mBluetoothLeScanner.startScan(mScanfilters,mScanSettings,scanCallback);
             mScanning = true;
 
         } else {
@@ -254,9 +277,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             super.onScanResult(callbackType, result);
 
             addBluetoothDevice(result.getDevice());
-
-            if(result.getDevice().getAddress() != null) {
+            /*if(result.getDevice().getAddress() != null) {
                 Log.e( "BLE", result.getDevice().getAddress() );
+            }*/
+
+            if(result.getScanRecord().getDeviceName() != null) Log.e( "Name", result.getScanRecord().getDeviceName() );
+
+            if(result.getScanRecord().getServiceData(pUUID) != null){
+                byte[] bData = result.getScanRecord().getServiceData(pUUID);
+                Map<ParcelUuid,byte[]> mMap = result.getScanRecord().getServiceData();
+                //byte[] mbyte =  mMap.get(0);
+                //Log.e( "mData", new String(mbyte, StandardCharsets.US_ASCII) );
+
+                String sData = new String(bData, StandardCharsets.US_ASCII);
+                Log.e( "Data", sData );
             }
         }
 
