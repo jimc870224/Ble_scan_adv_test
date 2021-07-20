@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">Ble_advtest</string>
     <string name="ble_uuid">CDB7950D-73F1-4D4D-8E47-C090502DBD63</string>
-    <string name="ble_uuid_16">950D</string>
+    <string name="ble_uuid_16">0000181C-0000-1000-8000-00805F9B34FB</string>
+    <string name="ble_uuid_mask">FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF</string>
 
 </resources>

@@ -1,14 +1,5 @@
 package com.example.ble_advtest;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import no.nordicsemi.android.support.v18.scanner.BluetoothLeScannerCompat;
-import no.nordicsemi.android.support.v18.scanner.ScanCallback;
-import no.nordicsemi.android.support.v18.scanner.ScanResult;
-import no.nordicsemi.android.support.v18.scanner.ScanSettings;
-
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -16,37 +7,42 @@ import android.bluetooth.BluetoothManager;
 import android.bluetooth.le.AdvertiseCallback;
 import android.bluetooth.le.AdvertiseData;
 import android.bluetooth.le.AdvertiseSettings;
-
 import android.bluetooth.le.BluetoothLeAdvertiser;
-import android.bluetooth.le.BluetoothLeScanner;
-//import android.bluetooth.le.ScanCallback;
-import android.bluetooth.le.ScanFilter;
-//import android.bluetooth.le.ScanResult;
-//import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.ParcelUuid;
-import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
+import androidx.appcompat.app.AppCompatActivity;
+
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.ConcurrentModificationException;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import static com.example.ble_advtest.BluetoothLeService.byteArrayToHexStr;
+import no.nordicsemi.android.support.v18.scanner.BluetoothLeScannerCompat;
+import no.nordicsemi.android.support.v18.scanner.ScanCallback;
+import no.nordicsemi.android.support.v18.scanner.ScanFilter;
+import no.nordicsemi.android.support.v18.scanner.ScanResult;
+import no.nordicsemi.android.support.v18.scanner.ScanSettings;
+
+
+//import android.bluetooth.le.ScanFilter;
+//import android.bluetooth.le.ScanCallback;
+//import android.bluetooth.le.ScanResult;
+//import android.bluetooth.le.ScanSettings;
 
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener{
@@ -60,14 +56,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private Handler advertisingHandler = new Handler();
     private Handler scanHandler = new Handler();
     //private final int TIMEOUT = 300;//(ms)
-    private final int Scanning_TIMEOUT = 10000;//(ms)
-    private final int Advtising_TIMEOUT = 1000;//(ms)
+    private final int Scanning_TIMEOUT = 500;//(ms)
+    private final int Advtising_TIMEOUT = 10000;//(ms)
     private boolean mScanning = false;
     private boolean mAdvertising = false;
 
     //--Ble--
     //UUID
     private ParcelUuid pUUID;
+    private ParcelUuid pUUID_16;
+    private ParcelUuid pUUID_mask;
 
     private BluetoothAdapter mBluetoothAdapter;
     //advertiser
@@ -78,8 +76,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     List<ScanFilter> mScanfilters = null;
     List<BluetoothDevice> listBluetoothDevice;
     private ScanSettings mScanSettings;
-
-    //private BluetoothLeScanner mBluetoothLeScanner;
     private BluetoothLeScannerCompat mBluetoothLeScanner;
 
     //PERMISSION
@@ -99,9 +95,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mStopButton.setOnClickListener( this );
         mStartButton.setOnClickListener( this );
 
-        //nordic
-        //mBluetoothLeScanner = BluetoothLeScannerCompat.getScanner();
-        //mBluetoothLeScanner = BluetoothAdapter.getDefaultAdapter().getBluetoothLeScanner();
 
         checkPermission();
         mText.setText("Ready to Start");
@@ -164,13 +157,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         if (requestCode == PERMISSION_REQUEST_CODE) {
             Log.d("TAG", String.valueOf(grantResults.length));
 
-            for(String per : permissions){
+            /*for(String per : permissions){
                 if(grantResults[0] == PackageManager.PERMISSION_GRANTED){
                     Log.d("TAG", per);
                 }
-            }
+            }*/
             //Do something based on grantResults
-            /*
+
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Log.d("TAG", "ACCESS_COARSE_LOCATION permission granted");
             } else {
@@ -193,10 +186,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 Log.d("TAG", "BLUETOOTH_ADMIN permission granted");
             } else {
                 Log.d("TAG", "BLUETOOTH_ADMIN permission denied");
-            }*/
+            }
         }
 
     }
+
+
 
 
     @RequiresApi(api = Build.VERSION_CODES.M)
@@ -208,19 +203,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         //UUID
         pUUID = new ParcelUuid( UUID.fromString( getString( R.string.ble_uuid ) ) );
+        pUUID_16 = ParcelUuid.fromString(getString( R.string.ble_uuid_16 ));
+        pUUID_mask = new ParcelUuid( UUID.fromString( getString( R.string.ble_uuid_mask ) ) );
+
 
         //--Scanner--
         mScanfilters = new ArrayList<>();
-        ScanFilter filter = new ScanFilter.Builder()
-                .setServiceData(pUUID, null)
-                .build();
-
+        //mScanfilters.add(new ScanFilter.Builder().setServiceData(pUUID,null).build());
+        mScanfilters.add(new ScanFilter.Builder().setServiceUuid(pUUID).build());
         mScanSettings = new ScanSettings.Builder()
                 .setScanMode( ScanSettings.SCAN_MODE_LOW_LATENCY )
-                .setCallbackType( ScanSettings.CALLBACK_TYPE_ALL_MATCHES )
                 .build();
 
-        //mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
         //nordic
         mBluetoothLeScanner = BluetoothLeScannerCompat.getScanner();
 
@@ -236,8 +230,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 .build();
 
         mAdvertiseData = new AdvertiseData.Builder()
-                .setIncludeDeviceName( true )
-                .addServiceData( pUUID, "Data".getBytes( Charset.forName( "US-ASCII" ) ) )
+                .setIncludeDeviceName( false )
+                .addServiceUuid(pUUID)
+                .addServiceData( pUUID_16, "Data".getBytes( Charset.forName( "US-ASCII" ) ) )
                 .build();
 
         //Log.e( "Data", "-----stop-----" );
@@ -311,8 +306,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             Log.e( "BLE", "scanning" );
             mText.setText("Scanning...");
-            //mBluetoothLeScanner.startScan(mScanfilters,mScanSettings,scanCallback);
-            mBluetoothLeScanner.startScan(scanCallback);
+            mBluetoothLeScanner.startScan(mScanfilters,mScanSettings,scanCallback);
+            //mBluetoothLeScanner.startScan(scanCallback);
             mScanning = true;
 
         } else {
@@ -337,7 +332,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             if(result.getScanRecord().getDeviceName() != null) {
                 Log.e( "Name", result.getScanRecord().getDeviceName() );
+            }
 
+            if(result.getScanRecord().getServiceData() != null)
+            {
                 Map<ParcelUuid,byte[]> mMap = result.getScanRecord().getServiceData();
                 int size = mMap.size();
                 Log.e( "uuid", String.valueOf(size) );
@@ -348,12 +346,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     Log.e( "data", sData );
 
                 }
-
-                if(result.getScanRecord().getServiceUuids() != null)
-                {
-                    Log.e( "uuid", result.getScanRecord().getServiceUuids().toString() );
-                }
             }
+
+            /*if(result.getScanRecord().getServiceUuids() != null)
+            {
+                Log.e( "uuid", result.getScanRecord().getServiceUuids().toString() );
+            }
+
+            String sData = bytesToHex(result.getScanRecord().getBytes());
+            Log.e( "data", sData );*/
 
         }
 
@@ -396,5 +397,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     };
     //runnable
+
+    private static final char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
+
+    public static String bytesToHex(byte[] bytes) {
+        char[] hexChars = new char[bytes.length * 2];
+        for (int j = 0; j < bytes.length; j++) {
+            int v = bytes[j] & 0xFF;
+            hexChars[j * 2] = HEX_ARRAY[v >>> 4];
+            hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
+        }
+        return new String(hexChars);
+    }
 
 }
