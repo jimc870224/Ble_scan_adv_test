@@ -56,10 +56,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private Handler advertisingHandler = new Handler();
     private Handler scanHandler = new Handler();
     //private final int TIMEOUT = 300;//(ms)
-    private final int Scanning_TIMEOUT = 500;//(ms)
-    private final int Advtising_TIMEOUT = 10000;//(ms)
+    private final int Scanning_TIMEOUT = 1000;//(ms)
+    private final int Advtising_TIMEOUT = 9000;//(ms)
     private boolean mScanning = false;
     private boolean mAdvertising = false;
+    private int N_receive = 0;
+    private int N_send = 0;
 
     //--Ble--
     //UUID
@@ -229,12 +231,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 .setConnectable( false )
                 .build();
 
-        mAdvertiseData = new AdvertiseData.Builder()
-                .setIncludeDeviceName( false )
-                .addServiceUuid(pUUID)
-                .addServiceData( pUUID_16, "Data".getBytes( Charset.forName( "US-ASCII" ) ) )
-                .build();
-
         //Log.e( "Data", "-----stop-----" );
         mAdvertising = false;
     }
@@ -266,6 +262,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public void advertise(final boolean enable) {
 
         if (enable) {
+            N_send++;
+
+            mAdvertiseData = new AdvertiseData.Builder()
+                    .setIncludeDeviceName( false )
+                    .addServiceUuid(pUUID)
+                    .addServiceData( pUUID_16, String.valueOf(N_send).getBytes( Charset.forName( "US-ASCII" ) ) )
+                    .build();
+
             //stop handler
             advertisingHandler.postDelayed(stop_advertising, Advtising_TIMEOUT);
 
