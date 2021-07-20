@@ -4,6 +4,10 @@ import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import no.nordicsemi.android.support.v18.scanner.BluetoothLeScannerCompat;
+import no.nordicsemi.android.support.v18.scanner.ScanCallback;
+import no.nordicsemi.android.support.v18.scanner.ScanResult;
+import no.nordicsemi.android.support.v18.scanner.ScanSettings;
 
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
@@ -15,10 +19,10 @@ import android.bluetooth.le.AdvertiseSettings;
 
 import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.bluetooth.le.BluetoothLeScanner;
-import android.bluetooth.le.ScanCallback;
+//import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
-import android.bluetooth.le.ScanResult;
-import android.bluetooth.le.ScanSettings;
+//import android.bluetooth.le.ScanResult;
+//import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
@@ -39,6 +43,7 @@ import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static com.example.ble_advtest.BluetoothLeService.byteArrayToHexStr;
@@ -55,8 +60,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private Handler advertisingHandler = new Handler();
     private Handler scanHandler = new Handler();
     //private final int TIMEOUT = 300;//(ms)
-    private final int Scanning_TIMEOUT = 2000;//(ms)
-    private final int Advtising_TIMEOUT = 300;//(ms)
+    private final int Scanning_TIMEOUT = 10000;//(ms)
+    private final int Advtising_TIMEOUT = 1000;//(ms)
     private boolean mScanning = false;
     private boolean mAdvertising = false;
 
@@ -73,7 +78,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     List<ScanFilter> mScanfilters = null;
     List<BluetoothDevice> listBluetoothDevice;
     private ScanSettings mScanSettings;
-    private BluetoothLeScanner mBluetoothLeScanner;
+
+    //private BluetoothLeScanner mBluetoothLeScanner;
+    private BluetoothLeScannerCompat mBluetoothLeScanner;
 
     //PERMISSION
     private static int PERMISSION_REQUEST_CODE = 1;
@@ -92,7 +99,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mStopButton.setOnClickListener( this );
         mStartButton.setOnClickListener( this );
 
-        mBluetoothLeScanner = BluetoothAdapter.getDefaultAdapter().getBluetoothLeScanner();
+        //nordic
+        //mBluetoothLeScanner = BluetoothLeScannerCompat.getScanner();
+        //mBluetoothLeScanner = BluetoothAdapter.getDefaultAdapter().getBluetoothLeScanner();
+
         checkPermission();
         mText.setText("Ready to Start");
 
@@ -102,11 +112,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     //---permission and setup---
+    @RequiresApi(api = Build.VERSION_CODES.M)
     private void checkPermission() {
 
         Log.d("TAG", "Request Location Permissions:");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, PERMISSION_REQUEST_CODE);
+
+            String[] PERMISSIONS = {
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.BLUETOOTH,
+                    Manifest.permission.BLUETOOTH_ADMIN
+            };
+
+
+            requestPermissions(PERMISSIONS, PERMISSION_REQUEST_CODE);
         }
 
         // Check if BLE is supported on the device.
@@ -142,17 +162,44 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_REQUEST_CODE) {
-            //Do something based on grantResults
-            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.d("TAG", "coarse location permission granted");
-            } else {
-                Log.d("TAG", "coarse location permission denied");
+            Log.d("TAG", String.valueOf(grantResults.length));
+
+            for(String per : permissions){
+                if(grantResults[0] == PackageManager.PERMISSION_GRANTED){
+                    Log.d("TAG", per);
+                }
             }
+            //Do something based on grantResults
+            /*
+            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.d("TAG", "ACCESS_COARSE_LOCATION permission granted");
+            } else {
+                Log.d("TAG", "ACCESS_COARSE_LOCATION permission denied");
+            }
+
+            if (grantResults[1] == PackageManager.PERMISSION_GRANTED) {
+                Log.d("TAG", "ACCESS_FINE_LOCATION permission granted");
+            } else {
+                Log.d("TAG", "ACCESS_FINE_LOCATION permission denied");
+            }
+
+            if (grantResults[2] == PackageManager.PERMISSION_GRANTED) {
+                Log.d("TAG", "BLUETOOTH permission granted");
+            } else {
+                Log.d("TAG", "BLUETOOTH permission denied");
+            }
+
+            if (grantResults[3] == PackageManager.PERMISSION_GRANTED) {
+                Log.d("TAG", "BLUETOOTH_ADMIN permission granted");
+            } else {
+                Log.d("TAG", "BLUETOOTH_ADMIN permission denied");
+            }*/
         }
 
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+
+    @RequiresApi(api = Build.VERSION_CODES.M)
     private void getBluetoothAdapterAndLeScannerAndAdvertiser() {
         // Get BluetoothAdapter and BluetoothLeScanner and BluetoothLeAdvertiser.
         final BluetoothManager bluetoothManager =
@@ -173,7 +220,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 .setCallbackType( ScanSettings.CALLBACK_TYPE_ALL_MATCHES )
                 .build();
 
-        mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
+        //mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
+        //nordic
+        mBluetoothLeScanner = BluetoothLeScannerCompat.getScanner();
+
         mScanning = false;
 
         //--Advertiser--
@@ -261,7 +311,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             Log.e( "BLE", "scanning" );
             mText.setText("Scanning...");
-            mBluetoothLeScanner.startScan(mScanfilters,mScanSettings,scanCallback);
+            //mBluetoothLeScanner.startScan(mScanfilters,mScanSettings,scanCallback);
+            mBluetoothLeScanner.startScan(scanCallback);
             mScanning = true;
 
         } else {
@@ -276,22 +327,34 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         public void onScanResult(int callbackType, ScanResult result) {
             super.onScanResult(callbackType, result);
 
+            Log.e( "BLE", "onResults " );
+
             addBluetoothDevice(result.getDevice());
             /*if(result.getDevice().getAddress() != null) {
                 Log.e( "BLE", result.getDevice().getAddress() );
             }*/
 
-            if(result.getScanRecord().getDeviceName() != null) Log.e( "Name", result.getScanRecord().getDeviceName() );
 
-            if(result.getScanRecord().getServiceData(pUUID) != null){
-                byte[] bData = result.getScanRecord().getServiceData(pUUID);
+            if(result.getScanRecord().getDeviceName() != null) {
+                Log.e( "Name", result.getScanRecord().getDeviceName() );
+
                 Map<ParcelUuid,byte[]> mMap = result.getScanRecord().getServiceData();
-                //byte[] mbyte =  mMap.get(0);
-                //Log.e( "mData", new String(mbyte, StandardCharsets.US_ASCII) );
+                int size = mMap.size();
+                Log.e( "uuid", String.valueOf(size) );
+                Set<ParcelUuid> uuidSet = mMap.keySet();
+                for(ParcelUuid u :uuidSet){
+                    Log.e( "uuid", u.toString() );
+                    String sData = new String(mMap.get(u), StandardCharsets.US_ASCII);
+                    Log.e( "data", sData );
 
-                String sData = new String(bData, StandardCharsets.US_ASCII);
-                Log.e( "Data", sData );
+                }
+
+                if(result.getScanRecord().getServiceUuids() != null)
+                {
+                    Log.e( "uuid", result.getScanRecord().getServiceUuids().toString() );
+                }
             }
+
         }
 
         @Override
